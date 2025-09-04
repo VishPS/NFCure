@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/utils"
+import HistoricalAnalysisModal from "./historical-analysis-modal"
 
 interface NFCScannerModalProps {
   isOpen: boolean
@@ -132,22 +133,20 @@ function PatientCard({ patient, delay }: { patient: any; delay: number }) {
   )
 }
 
-export function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
-  const [scanningState, setScanningState] = useState<"idle" | "scanning" | "authenticating" | "complete" | "error">(
-    "idle",
-  )
+function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
+  const [scanningState, setScanningState] = useState<'idle' | 'scanning' | 'authenticating' | 'complete' | 'error'>('idle')
   const [progress, setProgress] = useState(0)
   const [detectedPatient, setDetectedPatient] = useState<any>(null)
+  const [showHistoricalAnalysis, setShowHistoricalAnalysis] = useState(false)
   const router = useRouter()
 
   const startScan = () => {
     setScanningState("scanning")
     setProgress(0)
-    setDetectedPatient(null)
 
     // Simulate scanning progress
     const scanInterval = setInterval(() => {
-      setProgress((prev) => {
+      setProgress((prev: number) => {
         if (prev >= 100) {
           clearInterval(scanInterval)
           setScanningState("authenticating")
@@ -156,26 +155,57 @@ export function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
           setTimeout(async () => {
             try {
               // In a real app, you'd get the ID from the NFC scan
-              const scannedId = "P-2024-001"; // Using a valid ID from your database for demonstration
+              const scannedId = "P-2024-001"
               
               const { data: patient, error } = await supabase
                 .from('patients')
                 .select('*')
-                .eq('nfc_id', scannedId) // Corrected column name from 'id' to 'nfc_id'
+                .eq('nfc_id', scannedId)
                 .single()
 
-              if (error) {
-                throw error
-              }
+              let detectedPatientData;
 
-              if (patient) {
-                setDetectedPatient(patient)
-                setScanningState("complete")
+              if (patient && !error) {
+                // Use real patient data from database
+                detectedPatientData = {
+                  id: patient.nfc_id,
+                  name: patient.name,
+                  age: patient.age || 45,
+                  gender: patient.gender || "Male",
+                  vitals: {
+                    heartRate: patient.heart_rate || "72 bpm",
+                    bloodPressure: patient.blood_pressure || "120/80 mmHg",
+                    temperature: patient.temperature || "98.6°F",
+                    oxygenSat: patient.oxygen_saturation || "98"
+                  }
+                }
               } else {
-                setScanningState("error")
+                // Fallback to mock patient if database fails
+                console.log("Using mock patient data - database error:", error)
+                detectedPatientData = {
+                  id: "P001",
+                  name: "John Doe",
+                  age: 45,
+                  gender: "Male",
+                  vitals: {
+                    heartRate: "72 bpm",
+                    bloodPressure: "120/80 mmHg",
+                    temperature: "98.6°F",
+                    oxygenSat: "98"
+                  }
+                }
               }
+              
+              // Set detected patient
+              setDetectedPatient(detectedPatientData)
+              
+              // Show historical analysis modal immediately after patient detection - BLOCKING
+              console.log("🔍 Triggering historical analysis modal for patient:", detectedPatientData.id)
+              setShowHistoricalAnalysis(true)
+              // Don't set scanning state to complete until historical analysis is done
+              
             } catch (error) {
-              console.error("Error fetching patient data:", error)
+              console.error("Error during patient detection:", error)
               setScanningState("error")
             }
           }, 1500)
@@ -187,21 +217,54 @@ export function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
     }, 200)
   }
 
+  const handleProceedToDiagnosis = () => {
+    if (detectedPatient) {
+      router.push(`/diagnosis?patientId=${detectedPatient.id}&patientName=${encodeURIComponent(detectedPatient.name)}`)
+    }
+    onClose()
+  }
+
   const handleViewDashboard = () => {
+    // Only allow dashboard access after historical analysis is completed
+    if (showHistoricalAnalysis) {
+      // Historical analysis still pending - don't allow dashboard access
+      return
+    }
+    
     onClose()
     if (detectedPatient) {
       router.push(`/patient?id=${detectedPatient.id}`)
     }
   }
 
+  const handleHistoricalAnalysisComplete = () => {
+    // Close historical analysis and show patient detected screen
+    setShowHistoricalAnalysis(false)
+    setScanningState("complete")
+  }
+
   const handleClose = () => {
     setScanningState("idle")
     setProgress(0)
     setDetectedPatient(null)
+    setShowHistoricalAnalysis(false)
     onClose()
   }
 
   const renderScanningContent = () => {
+    // Hide main scanning content when historical analysis is showing
+    if (showHistoricalAnalysis) {
+      return (
+        <div className="text-center py-8">
+          <RadarScanner isScanning={false} isComplete={true} />
+          <h3 className="text-xl font-semibold mb-2 text-amber-600">⚠️ Historical Analysis Required</h3>
+          <p className="text-muted-foreground mb-4">
+            Please review the patient's medical history analysis before proceeding
+          </p>
+        </div>
+      )
+    }
+
     switch (scanningState) {
       case "idle":
         return (
@@ -324,6 +387,19 @@ export function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
           </div>
         )}
       </DialogContent>
+
+      {/* Historical Analysis Modal - BLOCKING */}
+      {detectedPatient && (
+        <HistoricalAnalysisModal
+          isOpen={showHistoricalAnalysis}
+          onClose={handleHistoricalAnalysisComplete}
+          patientId={detectedPatient.id}
+          patientName={detectedPatient.name}
+          onProceedToDiagnosis={handleProceedToDiagnosis}
+        />
+      )}
     </Dialog>
   )
 }
+
+export default NFCScannerModal

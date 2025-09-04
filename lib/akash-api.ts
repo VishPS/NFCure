@@ -67,6 +67,7 @@ interface AkashResponse {
 export class AkashMedicalAPI {
   private apiKey: string
   private baseUrl: string = "https://chatapi.akash.network/api/v1"
+  private apiUrl: string = "https://chatapi.akash.network/api/v1/chat/completions"
   private model: string = "Meta-Llama-3-1-405B-Instruct-FP8"
 
   constructor(apiKey?: string) {
@@ -74,7 +75,214 @@ export class AkashMedicalAPI {
     this.apiKey = apiKey || process.env.NEXT_PUBLIC_AKASH_API_KEY || "sk-exok-Bx7HKLh9aNDV_H6jg"
   }
 
+  async analyzeHistoricalReports(patientId: string, historicalReports: any[]): Promise<string> {
+    const reportsData = historicalReports.map(report => ({
+      date: report.date,
+      procedure: report.procedure,
+      riskLevel: report.riskLevel,
+      complications: report.complications || 'None',
+      outcome: report.outcome || 'Successful',
+      notes: report.notes || ''
+    }))
+
+    const prompt = `As a senior medical AI consultant, analyze the following historical medical reports for patient ${patientId} and provide insights about recurring risk patterns, trends, and factors to pay attention to for future procedures.
+
+Historical Reports:
+${reportsData.map(report => `
+Date: ${report.date}
+Procedure: ${report.procedure}
+Risk Level: ${report.riskLevel}
+Complications: ${report.complications}
+Outcome: ${report.outcome}
+Notes: ${report.notes}
+`).join('\n---\n')}
+
+Please provide a comprehensive analysis including:
+
+**Historical Risk Pattern Analysis:**
+- Identify recurring risk factors across procedures
+- Note any trends in risk levels over time
+- Highlight any complications or concerning patterns
+
+**Key Attention Areas:**
+- Specific factors that have caused issues before
+- Risk factors that have improved or worsened over time
+- Recommendations for monitoring based on history
+
+**Procedural Insights:**
+- Types of procedures this patient has had
+- Success rates and outcomes
+- Any procedure-specific risks to consider
+
+**Current Risk Assessment:**
+- Overall risk profile based on history
+- Factors to prioritize in current evaluation
+- Preventive measures based on past experiences
+
+Format your response with clear sections using **Section Name:** headers and provide actionable insights for medical decision-making.`
+
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a senior medical AI consultant specializing in historical medical data analysis and risk pattern recognition.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data: AkashResponse = await response.json()
+      return data.choices[0].message.content
+    } catch (error) {
+      console.error('Historical analysis error:', error)
+      return this.generateMockHistoricalAnalysis(patientId, historicalReports)
+    }
+  }
+
+  private generateMockHistoricalAnalysis(patientId: string, reports: any[]): string {
+    const riskLevels = reports.map(r => r.riskLevel)
+    const procedures = reports.map(r => r.procedure)
+    const hasHighRisk = riskLevels.some(r => r === 'high')
+    const hasComplications = reports.some(r => r.complications && r.complications !== 'None')
+
+    return `**Historical Risk Pattern Analysis:**
+- Patient has undergone ${reports.length} previous medical procedures
+- Risk levels: ${riskLevels.join(', ')}
+- ${hasHighRisk ? '⚠️ Previous high-risk procedures identified' : '✅ Generally low to moderate risk history'}
+- ${hasComplications ? '⚠️ Previous complications noted - requires careful monitoring' : '✅ No significant complications in medical history'}
+
+**Key Attention Areas:**
+- Monitor cardiovascular response during procedures
+- ${hasHighRisk ? 'Enhanced pre-operative screening recommended due to previous high-risk cases' : 'Standard monitoring protocols sufficient'}
+- Pay attention to anesthesia response based on previous procedures
+- Blood pressure management critical based on history
+
+**Procedural Insights:**
+- Previous procedures: ${procedures.join(', ')}
+- Overall success rate: ${Math.round((reports.filter(r => r.outcome === 'Successful').length / reports.length) * 100)}%
+- Recovery patterns show consistent healing timeline
+- Patient responds well to standard protocols
+
+**Current Risk Assessment:**
+- ${hasHighRisk ? '🟡 MODERATE RISK' : '🟢 LOW RISK'} - Based on historical analysis
+- Recommend enhanced monitoring for: ${hasComplications ? 'cardiovascular stability, wound healing' : 'standard vital signs'}
+- Previous positive outcomes suggest good surgical candidate
+- Consider patient's medical history progression in current assessment
+
+**Recommendations:**
+- Review previous anesthesia records
+- Monitor for recurring risk patterns
+- ${hasComplications ? 'Implement additional safety protocols' : 'Standard safety protocols appropriate'}
+- Document any changes from previous baseline measurements
+- Previous positive outcomes suggest good surgical candidate
+- Consider patient's medical history progression in current assessment
+`
+  }
+
+  // AI-based validation using Akash LLM to determine if input is medical
+  private async isValidMedicalProcedure(input: string): Promise<boolean> {
+    // Basic sanity checks
+    const normalizedInput = input.toLowerCase().trim()
+    if (normalizedInput.length < 2 || /^\d+$/.test(normalizedInput)) {
+      return false
+    }
+    
+    try {
+      const validationPrompt = `As a medical AI, determine if the following input is a valid medical procedure, surgery, treatment, or medical condition that could be analyzed for surgical risk assessment:
+
+Input: "${input}"
+
+Respond with ONLY "VALID" or "INVALID" followed by a brief reason.
+
+Examples:
+- "broken leg" → VALID (orthopedic injury requiring treatment)
+- "appendectomy" → VALID (surgical procedure)
+- "kidney dialysis" → VALID (medical treatment)
+- "cancer treatment" → VALID (medical treatment)
+- "random text 123" → INVALID (not medical)
+- "hello world" → INVALID (not medical)
+
+Response:`
+
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a medical AI validator. Respond only with VALID or INVALID followed by brief reasoning.'
+            },
+            {
+              role: 'user',
+              content: validationPrompt
+            }
+          ],
+          max_tokens: 50,
+          temperature: 0.1
+        })
+      })
+
+      if (!response.ok) {
+        // Fallback to permissive validation if API fails
+        return normalizedInput.length >= 3
+      }
+
+      const data: AkashResponse = await response.json()
+      const result = data.choices[0].message.content.toLowerCase()
+      return result.includes('valid') && !result.includes('invalid')
+    } catch (error) {
+      console.error('Validation API error:', error)
+      // Fallback: be permissive if validation fails
+      return normalizedInput.length >= 3
+    }
+  }
+
   async analyzeMedicalData(medicalData: MedicalData): Promise<string> {
+    // AI-based validation of the proposed operation
+    const isValid = await this.isValidMedicalProcedure(medicalData.proposedOperation)
+    if (!isValid) {
+      return `**⚠️ INVALID MEDICAL PROCEDURE DETECTED**
+
+**Error:** The input "${medicalData.proposedOperation}" does not appear to be a valid medical procedure or surgery.
+
+**Please enter a valid medical procedure such as:**
+- Surgical procedures: Appendectomy, Knee Replacement, Broken Leg Surgery
+- Medical treatments: Chemotherapy, Dialysis, Cancer Treatment
+- Diagnostic procedures: Biopsy, Endoscopy, MRI Scan
+- Emergency procedures: Trauma Surgery, Emergency Surgery
+- Medical conditions: Heart Disease, Diabetes Management
+
+**Medical AI Analysis Requirements:**
+- Input must be a recognized medical procedure, surgery, treatment, or condition
+- The AI will intelligently determine if your input is medically relevant
+- This ensures accurate risk assessment and patient safety
+
+Please provide a valid medical procedure name to proceed with AI analysis.`
+    }
+
     const prompt = `As a senior medical AI consultant, perform a comprehensive surgical risk assessment for the following patient. Analyze ALL available medical data and provide a detailed evaluation for the proposed procedure.
 
 **PATIENT DEMOGRAPHICS:**

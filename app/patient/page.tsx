@@ -20,10 +20,15 @@ import {
   ClipboardList,
   TestTube,
   Shield,
+  Brain,
+  CheckCircle,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
-import { NFCScannerModal } from "@/components/nfc-scanner-modal"
+import NFCScannerModal from "@/components/nfc-scanner-modal"
+import { akashAPI, MedicalData } from "@/lib/akash-api"
+import { useEffect } from "react"
 
 // Sidebar Navigation Component
 function PatientSidebar({
@@ -33,11 +38,10 @@ function PatientSidebar({
   const navigationItems = [
     { id: "vitals", label: "Vitals", icon: Activity },
     { id: "history", label: "History", icon: ClipboardList },
-    { id: "diagnosis", label: "Diagnosis", icon: Stethoscope },
     { id: "surgeries", label: "Surgeries", icon: Heart },
     { id: "medications", label: "Medications", icon: Pill },
     { id: "lab-reports", label: "Lab Reports", icon: TestTube },
-    { id: "nfc-scan", label: "NFC Scan", icon: Scan },
+    { id: "diagnosis", label: "Diagnosis", icon: Stethoscope },
   ]
 
   return (
@@ -374,6 +378,227 @@ function MedicationsSection() {
   )
 }
 
+// AI Diagnosis Section
+function DiagnosisSection({ 
+  nfcScanned, 
+  patientData,
+  showDiagnosis, 
+  diagnosisResult, 
+  isAnalyzing, 
+  proposedOperation, 
+  setProposedOperation, 
+  analyzeVitals, 
+  setShowDiagnosis 
+}: {
+  nfcScanned: boolean
+  patientData: any
+  showDiagnosis: boolean
+  diagnosisResult: string
+  isAnalyzing: boolean
+  proposedOperation: string
+  setProposedOperation: (value: string) => void
+  analyzeVitals: () => void
+  setShowDiagnosis: (value: boolean) => void
+}) {
+  if (!nfcScanned || !patientData) {
+    return (
+      <div className="text-center py-12">
+        <Brain className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-xl font-semibold mb-2 text-muted-foreground">AI Medical Analysis Unavailable</h3>
+        <p className="text-muted-foreground mb-6">
+          Please scan the patient's NFC tag first to fetch data from the database. AI diagnosis requires verified patient data for accurate analysis.
+        </p>
+        <div className="bg-card/30 border border-border/50 rounded-lg p-4 max-w-md mx-auto">
+          <p className="text-sm text-muted-foreground">
+            🔒 Security Protocol: AI diagnosis is only available after successful NFC authentication and data retrieval from the secure medical database.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Patient Data Confirmation */}
+      <Card className="medical-glow-green">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <CheckCircle className="h-6 w-6 text-secondary" />
+            <h3 className="text-lg font-semibold text-foreground">Patient Data Loaded Successfully</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Patient ID</p>
+              <p className="font-medium">{patientData.patientId}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Name</p>
+              <p className="font-medium">{patientData.patientName}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Age</p>
+              <p className="font-medium">{patientData.age} years</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Gender</p>
+              <p className="font-medium">{patientData.gender}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Diagnosis Interface */}
+      <Card className="medical-glow">
+        <CardContent className="p-8">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center medical-glow">
+                <Brain className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <h3 className="text-2xl font-bold text-foreground">AI Medical Diagnosis</h3>
+            </div>
+            <p className="text-muted-foreground">
+              Powered by Akash Network's advanced AI models to analyze comprehensive patient data including vital signs, medical history, medications, lab results, and provide surgical risk assessment.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Data Summary */}
+            <div className="bg-card/30 border border-border/50 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-foreground mb-3">Analyzing Patient Data:</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-3 w-3 text-destructive" />
+                  <span>Vital Signs ({patientData.heartRate})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="h-3 w-3 text-primary" />
+                  <span>Medical History ({patientData.medicalHistory?.length} records)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Brain className="h-3 w-3 text-secondary" />
+                  <span>Medications ({patientData.medications?.filter((m: any) => m.status === 'Active').length} active)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Activity className="h-3 w-3 text-chart-4" />
+                  <span>Lab Results ({patientData.labResults?.length} reports)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Operation Input */}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Proposed Operation/Procedure
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Cardiac bypass surgery, Appendectomy, Knee replacement..."
+                value={proposedOperation}
+                onChange={(e) => setProposedOperation(e.target.value)}
+                className="w-full px-4 py-3 bg-input border border-border/50 rounded-lg focus:border-primary focus:ring-primary/20 text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+
+            {/* Analyze Button */}
+            <div className="text-center">
+              <Button
+                onClick={analyzeVitals}
+                disabled={isAnalyzing || !proposedOperation.trim()}
+                size="lg"
+                className="px-8 py-4 text-lg medical-glow-green"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Brain className="mr-2 h-5 w-5 animate-spin" />
+                    Analyzing with AI...
+                  </>
+                ) : (
+                  <>
+                    <Stethoscope className="mr-2 h-5 w-5" />
+                    Analyze Surgical Risk
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Beautiful Loading Animation */}
+            {isAnalyzing && (
+              <div className="mt-8 p-8 bg-card/50 border border-border/50 rounded-lg">
+                <div className="text-center space-y-6">
+                  <div className="flex justify-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 border-4 border-primary/20 rounded-full"></div>
+                      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Brain className="h-8 w-8 text-primary animate-pulse" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-foreground">AI Analysis in Progress</h3>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                        <span>Processing patient vital signs...</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-secondary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <span>Analyzing medical history...</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-chart-4 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                        <span>Calculating surgical risk factors...</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-destructive rounded-full animate-bounce" style={{animationDelay: '0.3s'}}></div>
+                        <span>Generating recommendations...</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                    <p className="text-sm text-primary">
+                      🤖 Advanced AI models are analyzing {patientData?.medicalHistory?.length || 0} medical records, 
+                      {patientData?.medications?.filter((m: any) => m.status === 'Active').length || 0} active medications, 
+                      and {patientData?.labResults?.length || 0} lab reports to provide comprehensive surgical risk assessment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Diagnosis Results */}
+            {showDiagnosis && diagnosisResult && (
+              <div className="mt-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckCircle className="h-5 w-5 text-secondary" />
+                  <h4 className="text-lg font-semibold text-foreground">AI Diagnosis Results</h4>
+                </div>
+                <div className="bg-card/50 border border-border/50 rounded-lg p-6">
+                  <pre className="whitespace-pre-wrap text-sm text-foreground font-mono leading-relaxed">
+                    {diagnosisResult}
+                  </pre>
+                </div>
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDiagnosis(false)}
+                    className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground"
+                  >
+                    Close Results
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // Lab Reports Section
 function LabReportsSection() {
   const labReports = [
@@ -492,6 +717,175 @@ function LabReportsSection() {
 export default function PatientDashboard() {
   const [activeSection, setActiveSection] = useState("vitals")
   const [showNFCModal, setShowNFCModal] = useState(false)
+  const [showDiagnosis, setShowDiagnosis] = useState(false)
+  const [diagnosisResult, setDiagnosisResult] = useState("")
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [proposedOperation, setProposedOperation] = useState("")
+  const [nfcScanned, setNfcScanned] = useState(false)
+  const [patientData, setPatientData] = useState<any>(null)
+  const router = useRouter()
+
+  // Load patient data from localStorage on component mount
+  useEffect(() => {
+    const storedPatientData = localStorage.getItem('patientData')
+    const storedNfcScanned = localStorage.getItem('nfcScanned')
+    
+    if (storedPatientData && storedNfcScanned === 'true') {
+      setPatientData(JSON.parse(storedPatientData))
+      setNfcScanned(true)
+      // Keep vitals as default section - diagnosis moved after lab reports
+      setActiveSection("vitals")
+    }
+  }, [])
+
+  // Simulate NFC scan and data fetch
+  const handleNFCScan = () => {
+    setShowNFCModal(true)
+    // Simulate NFC scan success and data fetch from database
+    setTimeout(() => {
+      setNfcScanned(true)
+      // Simulate fetching patient data from database (like from Supabase)
+      const fetchedPatientData = {
+        // Current Vital Signs
+        heartRate: "72 BPM",
+        bloodPressure: "120/80 mmHg", 
+        temperature: "98.6°F",
+        bloodSugar: "95 mg/dL",
+        energyLevel: "85%",
+        
+        // Patient Demographics
+        patientId: "P-2024-001",
+        patientName: "John Doe",
+        age: 45,
+        gender: "Male",
+        
+        // Medical History
+        medicalHistory: [
+          {
+            date: "2024-01-15",
+            type: "Surgery",
+            description: "Appendectomy",
+            doctor: "Dr. Smith",
+            status: "Completed",
+            severity: "moderate"
+          },
+          {
+            date: "2023-11-22",
+            type: "Diagnosis",
+            description: "Hypertension",
+            doctor: "Dr. Johnson",
+            status: "Ongoing",
+            severity: "low"
+          },
+          {
+            date: "2023-08-10",
+            type: "Injury",
+            description: "Fractured wrist",
+            doctor: "Dr. Brown",
+            status: "Healed",
+            severity: "moderate"
+          },
+          {
+            date: "2023-03-05",
+            type: "Checkup",
+            description: "Annual physical examination",
+            doctor: "Dr. Johnson",
+            status: "Completed",
+            severity: "low"
+          }
+        ],
+        
+        // Current Medications
+        medications: [
+          {
+            name: "Lisinopril",
+            dosage: "10mg",
+            frequency: "Once daily",
+            startDate: "2023-11-22",
+            status: "Active",
+            purpose: "Blood pressure control"
+          },
+          {
+            name: "Metformin",
+            dosage: "500mg",
+            frequency: "Twice daily",
+            startDate: "2023-08-15",
+            status: "Active",
+            purpose: "Diabetes management"
+          },
+          {
+            name: "Ibuprofen",
+            dosage: "200mg",
+            frequency: "As needed",
+            startDate: "2024-01-10",
+            status: "Discontinued",
+            purpose: "Pain relief"
+          }
+        ],
+        
+        // Lab Results
+        labResults: [
+          {
+            id: "LAB-2024-001",
+            date: "2024-06-15",
+            type: "Complete Blood Count",
+            status: "Normal",
+            doctor: "Dr. Wilson"
+          },
+          {
+            id: "LAB-2024-002",
+            date: "2024-05-20",
+            type: "Lipid Panel",
+            status: "Abnormal",
+            doctor: "Dr. Johnson"
+          },
+          {
+            id: "LAB-2024-003",
+            date: "2024-04-10",
+            type: "Thyroid Function",
+            status: "Normal",
+            doctor: "Dr. Smith"
+          }
+        ],
+        
+        // Blood Work Values
+        bloodWork: [
+          { test: "Cholesterol", value: 180, normal: "< 200", status: "normal" },
+          { test: "Glucose", value: 95, normal: "70-100", status: "normal" },
+          { test: "Hemoglobin", value: 14.2, normal: "12-16", status: "normal" },
+          { test: "White Blood Cells", value: 7.5, normal: "4-11", status: "normal" }
+        ]
+      }
+      setPatientData(fetchedPatientData)
+      // Keep vitals as default section after successful scan
+      setActiveSection("vitals")
+    }, 2000)
+  }
+
+  // Function to analyze vitals and navigate to results page
+  const analyzeVitals = async () => {
+    if (!proposedOperation.trim()) {
+      alert("Please enter a proposed operation or procedure")
+      return
+    }
+
+    if (!patientData) {
+      alert("Patient data not available. Please scan NFC first.")
+      return
+    }
+
+    setIsAnalyzing(true)
+
+    // Store the proposed operation in localStorage for the results page
+    localStorage.setItem('proposedOperation', proposedOperation)
+
+    // Simulate analysis time with beautiful loading
+    setTimeout(() => {
+      setIsAnalyzing(false)
+      // Navigate to the new diagnosis results page
+      router.push('/diagnosis')
+    }, 3000) // 3 second loading animation
+  }
 
   const renderActiveSection = () => {
     switch (activeSection) {
@@ -499,24 +893,24 @@ export default function PatientDashboard() {
         return <VitalsSection />
       case "history":
         return <HistorySection />
+      case "diagnosis":
+        return (
+          <DiagnosisSection
+            nfcScanned={nfcScanned}
+            patientData={patientData}
+            showDiagnosis={showDiagnosis}
+            diagnosisResult={diagnosisResult}
+            isAnalyzing={isAnalyzing}
+            proposedOperation={proposedOperation}
+            setProposedOperation={setProposedOperation}
+            analyzeVitals={analyzeVitals}
+            setShowDiagnosis={setShowDiagnosis}
+          />
+        )
       case "medications":
         return <MedicationsSection />
       case "lab-reports":
         return <LabReportsSection />
-      case "nfc-scan":
-        return (
-          <div className="text-center py-12">
-            <Scan className="h-16 w-16 text-primary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">NFC Patient Scanner</h3>
-            <p className="text-muted-foreground mb-6">
-              Scan NFC tags to quickly access patient records and update medical information
-            </p>
-            <Button onClick={() => setShowNFCModal(true)} className="medical-glow" size="lg">
-              <Scan className="mr-2 h-5 w-5" />
-              Start NFC Scan
-            </Button>
-          </div>
-        )
       default:
         return <VitalsSection />
     }

@@ -6,10 +6,11 @@ import { Suspense, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Heart, Activity, Thermometer, Droplets, Zap, Scan, Brain, Stethoscope, AlertTriangle, CheckCircle } from "lucide-react"
+import { Heart, Activity, Thermometer, Droplets, Zap, Scan } from "lucide-react"
 import type * as THREE from "three"
-import { NFCScannerModal } from "@/components/nfc-scanner-modal"
-import { akashAPI, MedicalData } from "@/lib/akash-api"
+import NFCScannerModal from "@/components/nfc-scanner-modal"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 // 3D Human Skeleton Model Component
 function HumanModel() {
@@ -257,10 +258,14 @@ function VitalCard({
 export default function LandingPage() {
   const [isScanning, setIsScanning] = useState(false)
   const [showNFCModal, setShowNFCModal] = useState(false)
-  const [showDiagnosis, setShowDiagnosis] = useState(false)
-  const [diagnosisResult, setDiagnosisResult] = useState("")
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [proposedOperation, setProposedOperation] = useState("")
+  const router = useRouter()
+
+  // Handle NFC scan from homepage
+  const handleNFCScan = () => {
+    setShowNFCModal(true)
+    // Let the NFC scanner modal handle the entire flow
+    // No automatic navigation - user must complete the NFC scan process
+  }
 
   const vitalStats = [
     { icon: Heart, label: "Heart Rate", value: "72", unit: "BPM", status: "normal" as const, position: [-1.8, -1.2, 0] as [number, number, number] },
@@ -291,153 +296,6 @@ export default function LandingPage() {
     },
   ]
 
-  // Function to analyze vitals using Akash Chat API
-  const analyzeVitals = async () => {
-    if (!proposedOperation.trim()) {
-      alert("Please enter a proposed operation or procedure")
-      return
-    }
-
-    setIsAnalyzing(true)
-    setDiagnosisResult("")
-
-    try {
-      // Collect ALL patient data from the website for comprehensive analysis
-      const medicalData = {
-        // Current Vital Signs (from floating cards)
-        heartRate: "72 BPM",
-        bloodPressure: "120/80 mmHg", 
-        temperature: "98.6°F",
-        bloodSugar: "95 mg/dL",
-        energyLevel: "85%",
-        
-        // Patient Demographics
-        patientId: "P-2024-001",
-        patientName: "John Doe",
-        age: 45,
-        gender: "Male",
-        
-        // Medical History (from patient dashboard)
-        medicalHistory: [
-          {
-            date: "2024-01-15",
-            type: "Surgery",
-            description: "Appendectomy",
-            doctor: "Dr. Smith",
-            status: "Completed",
-            severity: "moderate"
-          },
-          {
-            date: "2023-11-22",
-            type: "Diagnosis",
-            description: "Hypertension",
-            doctor: "Dr. Johnson",
-            status: "Ongoing",
-            severity: "low"
-          },
-          {
-            date: "2023-08-10",
-            type: "Injury",
-            description: "Fractured wrist",
-            doctor: "Dr. Brown",
-            status: "Healed",
-            severity: "moderate"
-          },
-          {
-            date: "2023-03-05",
-            type: "Checkup",
-            description: "Annual physical examination",
-            doctor: "Dr. Johnson",
-            status: "Completed",
-            severity: "low"
-          }
-        ],
-        
-        // Current Medications (from patient dashboard)
-        medications: [
-          {
-            name: "Lisinopril",
-            dosage: "10mg",
-            frequency: "Once daily",
-            startDate: "2023-11-22",
-            status: "Active",
-            purpose: "Blood pressure control"
-          },
-          {
-            name: "Metformin",
-            dosage: "500mg",
-            frequency: "Twice daily",
-            startDate: "2023-08-15",
-            status: "Active",
-            purpose: "Diabetes management"
-          },
-          {
-            name: "Ibuprofen",
-            dosage: "200mg",
-            frequency: "As needed",
-            startDate: "2024-01-10",
-            status: "Discontinued",
-            purpose: "Pain relief"
-          }
-        ],
-        
-        // Lab Results (from patient dashboard)
-        labResults: [
-          {
-            id: "LAB-2024-001",
-            date: "2024-06-15",
-            type: "Complete Blood Count",
-            status: "Normal",
-            doctor: "Dr. Wilson"
-          },
-          {
-            id: "LAB-2024-002",
-            date: "2024-05-20",
-            type: "Lipid Panel",
-            status: "Abnormal",
-            doctor: "Dr. Johnson"
-          },
-          {
-            id: "LAB-2024-003",
-            date: "2024-04-10",
-            type: "Thyroid Function",
-            status: "Normal",
-            doctor: "Dr. Smith"
-          }
-        ],
-        
-        // Blood Work Values (from patient dashboard)
-        bloodWork: [
-          { test: "Cholesterol", value: 180, normal: "< 200", status: "normal" },
-          { test: "Glucose", value: 95, normal: "70-100", status: "normal" },
-          { test: "Hemoglobin", value: 14.2, normal: "12-16", status: "normal" },
-          { test: "White Blood Cells", value: 7.5, normal: "4-11", status: "normal" }
-        ],
-        
-        // Proposed Operation
-        proposedOperation: proposedOperation
-      }
-
-      // Use real Akash API for medical analysis
-      let result
-      try {
-        result = await akashAPI.analyzeMedicalData(medicalData)
-      } catch (apiError) {
-        console.warn('Akash API failed, using simulation:', apiError)
-        // Fallback to simulation if API fails
-        result = await akashAPI.simulateAnalysis(medicalData)
-      }
-
-      setDiagnosisResult(result)
-      setShowDiagnosis(true)
-    } catch (error) {
-      console.error('Analysis error:', error)
-      setDiagnosisResult("Error analyzing vitals. Please try again.")
-      setShowDiagnosis(true)
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background grid-pattern relative overflow-hidden">
@@ -452,15 +310,11 @@ export default function LandingPage() {
           </div>
 
           <nav className="flex items-center gap-6">
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Dashboard
-            </Button>
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Patients
-            </Button>
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Analytics
-            </Button>
+            <Link href="/contact">
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                Contact Us
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -480,25 +334,13 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* 3D Scene Container */}
-          <div className="relative h-[450px] w-full mb-12">
-            <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-              <Suspense fallback={null}>
-                <ambientLight intensity={0.5} />
-                <pointLight position={[10, 10, 10]} intensity={1} color="#0d74ff" />
-                <pointLight position={[-10, -10, -10]} intensity={0.5} color="#00bfae" />
-
-                <HumanModel />
-
-                <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={1} />
-                <Environment preset="night" />
-              </Suspense>
-            </Canvas>
-
-            {/* Floating Vital Statistics */}
-            {vitalStats.map((stat, index) => (
-              <VitalCard key={index} {...stat} />
-            ))}
+          {/* GIF Container */}
+          <div className="relative h-[450px] w-full mb-12 flex items-center justify-center">
+            <img 
+              src="https://assets.superhivemarket.com/cache/12da5a4fb6d9da25828a2b5e61d60712.gif"
+              alt="Medical Animation"
+              className="max-h-full max-w-full object-contain rounded-lg medical-glow"
+            />
           </div>
 
           {/* Mobile Vital Statistics Grid */}
@@ -541,7 +383,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               className="px-8 py-4 text-lg medical-glow pulse-animation"
-              onClick={() => setShowNFCModal(true)}
+              onClick={handleNFCScan}
             >
               <Scan className="mr-2 h-5 w-5" />
               Scan NFC
@@ -552,113 +394,10 @@ export default function LandingPage() {
               variant="outline"
               className="px-8 py-4 text-lg border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground medical-glow-green bg-transparent"
             >
-              Explore Digital Twin
+              Learn About NFCure AI Medical Platform
             </Button>
           </div>
 
-          {/* AI Diagnosis Section */}
-          <div className="max-w-4xl mx-auto">
-            <Card className="medical-glow">
-              <CardContent className="p-8">
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center medical-glow">
-                      <Brain className="h-6 w-6 text-primary-foreground" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground">AI Medical Diagnosis</h3>
-                  </div>
-                  <p className="text-muted-foreground">
-                    Powered by Akash Network's advanced AI models to analyze ALL patient data including vital signs, medical history, medications, lab results, and provide comprehensive surgical risk assessment
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Data Summary */}
-                  <div className="bg-card/30 border border-border/50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-foreground mb-3">Patient Data Being Analyzed:</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Heart className="h-3 w-3 text-destructive" />
-                        <span>Vital Signs</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Stethoscope className="h-3 w-3 text-primary" />
-                        <span>Medical History</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-3 w-3 text-secondary" />
-                        <span>Medications</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-chart-4" />
-                        <span>Lab Results</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Operation Input */}
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">
-                      Proposed Operation/Procedure
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Cardiac bypass surgery, Appendectomy, Knee replacement..."
-                      value={proposedOperation}
-                      onChange={(e) => setProposedOperation(e.target.value)}
-                      className="w-full px-4 py-3 bg-input border border-border/50 rounded-lg focus:border-primary focus:ring-primary/20 text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  {/* Analyze Button */}
-                  <div className="text-center">
-                    <Button
-                      onClick={analyzeVitals}
-                      disabled={isAnalyzing || !proposedOperation.trim()}
-                      size="lg"
-                      className="px-8 py-4 text-lg medical-glow-green"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <Brain className="mr-2 h-5 w-5 animate-spin" />
-                          Analyzing with AI...
-                        </>
-                      ) : (
-                        <>
-                          <Stethoscope className="mr-2 h-5 w-5" />
-                          Analyze Surgical Risk
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Diagnosis Results */}
-                  {showDiagnosis && diagnosisResult && (
-                    <div className="mt-8">
-                      <div className="flex items-center gap-2 mb-4">
-                        <CheckCircle className="h-5 w-5 text-secondary" />
-                        <h4 className="text-lg font-semibold text-foreground">AI Diagnosis Results</h4>
-                      </div>
-                      <div className="bg-card/50 border border-border/50 rounded-lg p-6">
-                        <pre className="whitespace-pre-wrap text-sm text-foreground font-mono leading-relaxed">
-                          {diagnosisResult}
-                        </pre>
-                      </div>
-                      <div className="mt-4 text-center">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowDiagnosis(false)}
-                          className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground"
-                        >
-                          Close Results
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </main>
 
