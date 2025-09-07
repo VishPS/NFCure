@@ -134,7 +134,9 @@ function PatientCard({ patient, delay }: { patient: any; delay: number }) {
 }
 
 function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
-  const [scanningState, setScanningState] = useState<'idle' | 'scanning' | 'authenticating' | 'complete' | 'error'>('idle')
+  const [scanningState, setScanningState] = useState<
+    "idle" | "scanning" | "authenticating" | "complete" | "error"
+  >("idle")
   const [progress, setProgress] = useState(0)
   const [detectedPatient, setDetectedPatient] = useState<any>(null)
   const [showHistoricalAnalysis, setShowHistoricalAnalysis] = useState(false)
@@ -144,9 +146,8 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
     setScanningState("scanning")
     setProgress(0)
 
-    // Simulate scanning progress
     const scanInterval = setInterval(() => {
-      setProgress((prev: number) => {
+      setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(scanInterval)
           setScanningState("authenticating")
@@ -154,33 +155,29 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
           // Simulate authentication and data fetch
           setTimeout(async () => {
             try {
-              // In a real app, you'd get the ID from the NFC scan
-              const scannedId = "P-2024-001"
-              
+              const scannedId = "P-2024-007" // Hardcoded ID for demo
               const { data: patient, error } = await supabase
-                .from('patients')
-                .select('*')
-                .eq('nfc_id', scannedId)
+                .from("patients")
+                .select("*")
+                .eq("nfc_id", scannedId)
                 .single()
 
-              let detectedPatientData;
+              let detectedPatientData
 
               if (patient && !error) {
-                // Use real patient data from database
                 detectedPatientData = {
                   id: patient.nfc_id,
                   name: patient.name,
                   age: patient.age || 45,
                   gender: patient.gender || "Male",
                   vitals: {
-                    heartRate: patient.heart_rate || "72 bpm",
-                    bloodPressure: patient.blood_pressure || "120/80 mmHg",
-                    temperature: patient.temperature || "98.6°F",
-                    oxygenSat: patient.oxygen_saturation || "98"
-                  }
+                    heartRate: patient.heart_rate || "72",
+                    bloodPressure: patient.blood_pressure || "120/80",
+                    temperature: patient.temperature || "98.6",
+                    oxygenSat: patient.oxygen_saturation || "98",
+                  },
                 }
               } else {
-                // Fallback to mock patient if database fails
                 console.log("Using mock patient data - database error:", error)
                 detectedPatientData = {
                   id: "P001",
@@ -188,22 +185,16 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
                   age: 45,
                   gender: "Male",
                   vitals: {
-                    heartRate: "72 bpm",
-                    bloodPressure: "120/80 mmHg",
-                    temperature: "98.6°F",
-                    oxygenSat: "98"
-                  }
+                    heartRate: "72",
+                    bloodPressure: "120/80",
+                    temperature: "98.6",
+                    oxygenSat: "98",
+                  },
                 }
               }
-              
-              // Set detected patient
+
               setDetectedPatient(detectedPatientData)
-              
-              // Show historical analysis modal immediately after patient detection - BLOCKING
-              console.log("🔍 Triggering historical analysis modal for patient:", detectedPatientData.id)
               setShowHistoricalAnalysis(true)
-              // Don't set scanning state to complete until historical analysis is done
-              
             } catch (error) {
               console.error("Error during patient detection:", error)
               setScanningState("error")
@@ -219,18 +210,17 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
 
   const handleProceedToDiagnosis = () => {
     if (detectedPatient) {
-      router.push(`/diagnosis?patientId=${detectedPatient.id}&patientName=${encodeURIComponent(detectedPatient.name)}`)
+      router.push(
+        `/diagnosis?patientId=${detectedPatient.id}&patientName=${encodeURIComponent(
+          detectedPatient.name
+        )}`
+      )
     }
     onClose()
   }
 
   const handleViewDashboard = () => {
-    // Only allow dashboard access after historical analysis is completed
-    if (showHistoricalAnalysis) {
-      // Historical analysis still pending - don't allow dashboard access
-      return
-    }
-    
+    if (showHistoricalAnalysis) return
     onClose()
     if (detectedPatient) {
       router.push(`/patient?id=${detectedPatient.id}`)
@@ -238,7 +228,6 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
   }
 
   const handleHistoricalAnalysisComplete = () => {
-    // Close historical analysis and show patient detected screen
     setShowHistoricalAnalysis(false)
     setScanningState("complete")
   }
@@ -252,12 +241,13 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
   }
 
   const renderScanningContent = () => {
-    // Hide main scanning content when historical analysis is showing
     if (showHistoricalAnalysis) {
       return (
         <div className="text-center py-8">
           <RadarScanner isScanning={false} isComplete={true} />
-          <h3 className="text-xl font-semibold mb-2 text-amber-600">⚠️ Historical Analysis Required</h3>
+          <h3 className="text-xl font-semibold mb-2 text-amber-600">
+            ⚠️ Historical Analysis Required
+          </h3>
           <p className="text-muted-foreground mb-4">
             Please review the patient's medical history analysis before proceeding
           </p>
@@ -286,7 +276,9 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
           <div className="text-center py-8">
             <RadarScanner isScanning={true} isComplete={false} />
             <h3 className="text-xl font-semibold mb-2">Scanning for NFC Tag...</h3>
-            <p className="text-muted-foreground mb-4">Keep device steady and close to the medical tag</p>
+            <p className="text-muted-foreground mb-4">
+              Keep device steady and close to the medical tag
+            </p>
             <div className="space-y-2 max-w-xs mx-auto">
               <div className="flex justify-between text-sm">
                 <span>Scan Progress</span>
@@ -302,11 +294,19 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
           <div className="text-center py-8">
             <RadarScanner isScanning={true} isComplete={false} />
             <h3 className="text-xl font-semibold mb-2">Authenticating Patient...</h3>
-            <p className="text-muted-foreground mb-4">Verifying medical credentials and access permissions</p>
+            <p className="text-muted-foreground mb-4">
+              Verifying medical credentials and access permissions
+            </p>
             <div className="flex items-center justify-center gap-2">
               <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+              <div
+                className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                style={{ animationDelay: "0.1s" }}
+              />
+              <div
+                className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              />
             </div>
           </div>
         )
@@ -315,8 +315,12 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
         return (
           <div className="text-center py-8">
             <RadarScanner isScanning={false} isComplete={true} />
-            <h3 className="text-xl font-semibold mb-2 text-secondary">Patient Authenticated!</h3>
-            <p className="text-muted-foreground mb-6">Successfully connected to patient medical records</p>
+            <h3 className="text-xl font-semibold mb-2 text-secondary">
+              Patient Authenticated!
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Successfully connected to patient medical records
+            </p>
 
             {detectedPatient && (
               <div className="mb-6">
@@ -344,7 +348,8 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
             </div>
             <h3 className="text-xl font-semibold mb-2 text-destructive">Scan Failed</h3>
             <p className="text-muted-foreground mb-6">
-              Unable to detect NFC tag. Please ensure the device is close to the medical tag and try again.
+              Unable to detect NFC tag. Please ensure the device is close to the medical tag and try
+              again.
             </p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => setScanningState("idle")} className="medical-glow" size="lg">
@@ -388,7 +393,6 @@ function NFCScannerModal({ isOpen, onClose }: NFCScannerModalProps) {
         )}
       </DialogContent>
 
-      {/* Historical Analysis Modal - BLOCKING */}
       {detectedPatient && (
         <HistoricalAnalysisModal
           isOpen={showHistoricalAnalysis}
